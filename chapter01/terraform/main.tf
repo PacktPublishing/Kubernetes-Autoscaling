@@ -123,7 +123,7 @@ module "eks" {
   eks_managed_node_groups = {
     managed-ondemand = {
       node_group_name = "managed-ondemand"
-      instance_types  = ["m4.xlarge", "m5.xlarge", "m5a.xlarge", "m5ad.xlarge", "m5d.xlarge", "t2.xlarge", "t3.xlarge", "t3a.xlarge"]
+      instance_types  = ["m6g.xlarge", "m6gd.xlarge", "m7g.xlarge", "c6g.xlarge", "c6gd.xlarge", "c7g.xlarge"]
 
       create_security_group = false
 
