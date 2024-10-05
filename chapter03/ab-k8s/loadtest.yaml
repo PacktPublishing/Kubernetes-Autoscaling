@@ -1,0 +1,25 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: montecarlo-pi-load-test
+spec:
+  template:
+    spec:
+      containers:
+      - name: ab
+        image: christianhxc/ab-tool:latest
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          cp /scripts/incremental_load_test.sh /tmp/
+          chmod +x /tmp/incremental_load_test.sh
+          /tmp/incremental_load_test.sh
+        volumeMounts:
+        - name: script
+          mountPath: /scripts
+      restartPolicy: Never
+      volumes:
+      - name: script
+        configMap:
+          name: montecarlo-pi-load-test-script
+  backoffLimit: 0

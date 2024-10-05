@@ -73,7 +73,7 @@ locals {
   name   = "kubernetes-autoscaling"
   region = var.region
 
-  cluster_version = "1.31"
+  cluster_version = "1.30"
 
   vpc_cidr = "10.0.0.0/16"
   azs      = slice(data.aws_availability_zones.available.names, 0, 3)
@@ -133,7 +133,6 @@ module "eks" {
       min_size     = 2
 
       # Launch template configuration
-      ami_type               = "AL2_ARM_64"
       create_launch_template = true # false will use the default launch template
       launch_template_os     = "bottlerocket"
 
@@ -161,6 +160,17 @@ module "eks_blueprints_addons" {
 
   enable_metrics_server = true
 
+  enable_karpenter = true
+  karpenter = {
+    chart_version       = "1.0.2"
+    repository_username = data.aws_ecrpublic_authorization_token.token.user_name
+    repository_password = data.aws_ecrpublic_authorization_token.token.password
+  }
+  karpenter_enable_spot_termination          = true
+  karpenter_enable_instance_profile_creation = true
+  karpenter_node = {
+    iam_role_use_name_prefix = false
+  }
   tags = local.tags
 }
 
@@ -190,6 +200,11 @@ module "aws-auth" {
   manage_aws_auth_configmap = true
 
   aws_auth_roles = [
+    {
+      rolearn  = module.eks_blueprints_addons.karpenter.node_iam_role_arn
+      username = "system:node:{{EC2PrivateDNSName}}"
+      groups   = ["system:bootstrappers", "system:nodes"]
+    },
     {
       rolearn  = "arn:aws:iam::--AWS_ACCOUNT_ID--:role/WSParticipantRole"
       username = "admin"
