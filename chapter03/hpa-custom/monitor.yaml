@@ -1,0 +1,12 @@
+kind: ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+metadata:
+  name: montecarlo-pi
+  labels:
+    app: montecarlo-pi
+spec:
+  selector:
+    matchLabels:
+      app: montecarlo-pi
+  endpoints:
+  - port: http
