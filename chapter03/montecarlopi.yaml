@@ -21,9 +21,6 @@ spec:
           requests:
             cpu: 900m
             memory: 512Mi
-          limits:
-            cpu: 1200m
-            memory: 512Mi
 ---
 apiVersion: v1
 kind: Service

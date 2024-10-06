@@ -11,15 +11,7 @@ spec:
         command: ["/bin/sh", "-c"]
         args:
         - |
-          cp /scripts/incremental_load_test.sh /tmp/
-          chmod +x /tmp/incremental_load_test.sh
-          /tmp/incremental_load_test.sh
-        volumeMounts:
-        - name: script
-          mountPath: /scripts
+          ab -n 10000 -c 10 -t 150 http://montecarlo-pi/monte-carlo-pi?iterations=100000
+          echo "Load test completed"
       restartPolicy: Never
-      volumes:
-      - name: script
-        configMap:
-          name: montecarlo-pi-load-test-script
   backoffLimit: 0
