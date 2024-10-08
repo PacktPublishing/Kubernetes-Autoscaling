@@ -17,7 +17,8 @@ spec:
         image: christianhxc/montecarlo-pi
         imagePullPolicy: Always
         ports:
-        - containerPort: 8080
+        - name: http
+          containerPort: 8080
         resources:
           requests:
             cpu: 900m
@@ -31,7 +32,9 @@ metadata:
     app: montecarlo-pi
 spec:
   ports:
-  - port: 80
+  - name: http
+    port: 80
+    protocol: TCP
     targetPort: 8080
   selector:
     app: montecarlo-pi

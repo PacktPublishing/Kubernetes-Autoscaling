@@ -4,6 +4,7 @@ metadata:
   name: montecarlo-pi
   labels:
     app: montecarlo-pi
+    release: prometheus
 spec:
   selector:
     matchLabels:

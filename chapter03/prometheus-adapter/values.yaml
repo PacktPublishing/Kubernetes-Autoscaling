@@ -1,0 +1,14 @@
+prometheus:
+  url: http://prometheus-kube-prometheus-prometheus.monitoring.svc
+  port: 9090
+rules:
+  custom:
+  - seriesQuery: '{__name__=~"monte_carlo_latency_seconds_.+"}'
+    resources:
+      overrides:
+        namespace: {resource: "namespace"}
+        pod: {resource: "pod"}
+    name:
+      matches: "^monte_carlo_latency_seconds_(.+)"
+      as: "monte_carlo_latency_seconds"
+    metricsQuery: 'histogram_quantile(0.95, sum(rate(<<.Series>>{<<.LabelMatchers>>}[5m])) by (le, pod))'
