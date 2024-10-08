@@ -16,4 +16,4 @@ spec:
         name: monte_carlo_latency_seconds
       target:
         type: AverageValue
-        averageValue: 0.500
+        averageValue: 500m

@@ -3,12 +3,12 @@ prometheus:
   port: 9090
 rules:
   custom:
-  - seriesQuery: '{__name__=~"monte_carlo_latency_seconds_.+"}'
+  - seriesQuery: '{__name__="monte_carlo_latency_seconds_bucket",namespace!="",pod!=""}'
     resources:
       overrides:
         namespace: {resource: "namespace"}
         pod: {resource: "pod"}
     name:
-      matches: "^monte_carlo_latency_seconds_(.+)"
+      matches: "^(.*)_bucket"
       as: "monte_carlo_latency_seconds"
-    metricsQuery: 'histogram_quantile(0.95, sum(rate(<<.Series>>{<<.LabelMatchers>>}[5m])) by (le, pod))'
+    metricsQuery: 'histogram_quantile(0.95, rate(<<.Series>>{<<.LabelMatchers>>}[2m]))'
