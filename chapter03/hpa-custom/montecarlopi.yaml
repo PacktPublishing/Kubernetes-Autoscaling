@@ -15,7 +15,6 @@ spec:
       containers:
       - name: montecarlo-pi
         image: christianhxc/montecarlo-pi
-        imagePullPolicy: Always
         ports:
         - name: http
           containerPort: 8080
