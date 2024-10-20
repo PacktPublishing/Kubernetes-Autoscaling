@@ -1,0 +1,13 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: montecarlo-pi
+  labels:
+    app: montecarlo-pi
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: montecarlo-pi
+  endpoints:
+  - port: http

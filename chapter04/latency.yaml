@@ -1,0 +1,15 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: montecarlo-pi-latency
+spec:
+  scaleTargetRef:
+    name: montecarlo-pi
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  triggers:
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus-kube-prometheus-prometheus.monitoring.svc:9090
+      threshold: "0.5" # You can't specify 500m, it needs to be translated to seconds
+      query: histogram_quantile(0.95, rate(monte_carlo_latency_seconds_bucket{namespace="default",pod=~"montecarlo-pi.*"}[2m]))
