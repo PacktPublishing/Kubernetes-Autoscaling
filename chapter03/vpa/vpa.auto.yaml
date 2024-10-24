@@ -17,3 +17,4 @@ spec:
           cpu: 1200
           memory: 512Mi
         controlledResources: ["cpu", "memory"]
+        controlledValues: RequestsOnly
