@@ -5,16 +5,14 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY *.go ./
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o montecarlo .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o consumer .
 
 FROM alpine:3.20.3
 
 RUN apk --no-cache add ca-certificates
 WORKDIR /root/
-COPY --from=builder /app/montecarlo .
+COPY --from=builder /app/consumer .
 RUN adduser -D appuser
 USER appuser
 
-CMD ["./montecarlo"]
-
-EXPOSE 8080
+CMD ["./consumer"]
