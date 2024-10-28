@@ -75,6 +75,13 @@ func declareQueue(ch *amqp.Channel, queueName string) amqp.Queue {
 }
 
 func processMessages(ch *amqp.Channel, q amqp.Queue, batchSize int) {
+	err := ch.Qos(
+		batchSize, // prefetch count
+		0,         // prefetch size
+		false,     // global
+	)
+	failOnError(err, "Failed to set QoS")
+
 	msgs, err := ch.Consume(
 		q.Name, // queue
 		"",     // consumer

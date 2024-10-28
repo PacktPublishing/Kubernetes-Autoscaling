@@ -1,11 +1,12 @@
-FROM golang:1.23.1-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.23.1-alpine AS builder
 
 WORKDIR /app
 
 COPY go.mod go.sum ./
 RUN go mod download
 COPY *.go ./
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o consumer .
+ARG TARGETOS TARGETARCH
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH CGO_ENABLED=0 go build -a -installsuffix cgo -o consumer .
 
 FROM alpine:3.20.3
 
