@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: queue-producer
+spec:
+  template:
+    spec:
+      containers:
+      - name: producer
+        image: christianhxc/rabbitmq-producer:latest
+        env:
+        - name: RABBITMQ_URL
+          value: "amqp://user:autoscaling@rabbitmq.default.svc.cluster.local:5672"
+        - name: QUEUE_NAME
+          value: "autoscaling"
+        - name: MESSAGE_COUNT
+          value: "300"
+        - name: MESSAGE_PREFIX
+          value: "Kubernetes Autoscaling with KEDA!"
+      restartPolicy: Never
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 30

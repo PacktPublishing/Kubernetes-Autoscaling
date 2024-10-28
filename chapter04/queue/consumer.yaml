@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rabbitmq-host
+data:
+  RabbitMqHost: YW1xcDovL3VzZXI6YXV0b3NjYWxpbmdAcmFiYml0bXEuZGVmYXVsdC5zdmMuY2x1c3Rlci5sb2NhbDo1Njcy
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: queue-consumer
+  labels:
+    app: queue-consumer
+spec:
+  selector:
+    matchLabels:
+      app: queue-consumer
+  template:
+    metadata:
+      labels:
+        app: queue-consumer
+    spec:
+      containers:
+        - name: consumer
+          image: christianhxc/rabbitmq-consumer:latest
+          imagePullPolicy: Always
+          env:
+          - name: RABBITMQ_URL
+            value: "amqp://user:autoscaling@rabbitmq.default.svc.cluster.local:5672"
+          - name: QUEUE_NAME
+            value: "autoscaling"
+          resources:
+            requests:
+              cpu: 300m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: queue-consumer
+spec:
+  scaleTargetRef:
+    name: queue-consumer
+  pollingInterval: 15  # Check every 15 seconds
+  cooldownPeriod:  30  # Wait 30 seconds before scaling down
+  maxReplicaCount: 30  # Maximum number of replicas
+  triggers:
+  - type: rabbitmq
+    metadata:
+      queueName: autoscaling
+      queueLength: "10" # Scale up when there are more than 10 messages per pod
+    authenticationRef:
+      name: rabbitmq-auth
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: rabbitmq-auth
+spec:
+  secretTargetRef:
+    - parameter: host
+      name: rabbitmq-host
+      key: RabbitMqHost
+---

@@ -23,22 +23,14 @@ func main() {
 	defer ch.Close()
 
 	q := declareQueue(ch, config.QueueName)
-	setQoS(ch, config.BatchSize)
-
-	for {
-		processMessages(ch, q, config.BatchSize)
-	}
+	processMessages(ch, q, config.BatchSize)
 }
 
 func loadConfig() Config {
-	rabbitMQURL := getEnvOrFail("RABBITMQ_URL")
-	queueName := getEnvOrFail("QUEUE_NAME")
-	batchSize := getEnvOrDefault("BATCH_SIZE", "10")
-
 	return Config{
-		RabbitMQURL: rabbitMQURL,
-		QueueName:   queueName,
-		BatchSize:   parseBatchSize(batchSize),
+		RabbitMQURL: getEnvOrFail("RABBITMQ_URL"),
+		QueueName:   getEnvOrFail("QUEUE_NAME"),
+		BatchSize:   getEnvAsIntOrFail("BATCH_SIZE"),
 	}
 }
 
@@ -50,23 +42,13 @@ func getEnvOrFail(key string) string {
 	return value
 }
 
-func getEnvOrDefault(key, defaultValue string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		return defaultValue
-	}
-	return value
-}
-
-func parseBatchSize(batchSizeStr string) int {
-	batchSize, err := strconv.Atoi(batchSizeStr)
+func getEnvAsIntOrFail(key string) int {
+	value := getEnvOrFail(key)
+	intValue, err := strconv.Atoi(value)
 	if err != nil {
-		log.Fatalf("Invalid BATCH_SIZE value: %s", err)
+		log.Fatalf("Invalid %s value: %s", key, err)
 	}
-	if batchSize <= 0 {
-		log.Fatal("BATCH_SIZE must be a positive integer")
-	}
-	return batchSize
+	return intValue
 }
 
 func setupRabbitMQ(config Config) (*amqp.Connection, *amqp.Channel) {
@@ -92,15 +74,6 @@ func declareQueue(ch *amqp.Channel, queueName string) amqp.Queue {
 	return q
 }
 
-func setQoS(ch *amqp.Channel, prefetchCount int) {
-	err := ch.Qos(
-		prefetchCount, // prefetch count
-		0,             // prefetch size
-		false,         // global
-	)
-	failOnError(err, "Failed to set QoS")
-}
-
 func processMessages(ch *amqp.Channel, q amqp.Queue, batchSize int) {
 	msgs, err := ch.Consume(
 		q.Name, // queue
@@ -113,43 +86,37 @@ func processMessages(ch *amqp.Channel, q amqp.Queue, batchSize int) {
 	)
 	failOnError(err, "Failed to register a consumer")
 
-	messageCount := 0
-	timeout := time.After(10 * time.Second)
-
-	for {
-		select {
-		case msg, ok := <-msgs:
-			if !ok {
-				log.Println("Channel closed")
-				return
-			}
-			processMessage(msg)
-			messageCount++
-			if messageCount == batchSize {
-				log.Printf("Processed %d messages", messageCount)
-				return
-			}
-		case <-timeout:
-			if messageCount == 0 {
-				log.Println("No messages available. Waiting for 10 seconds before terminating.")
-				time.Sleep(10 * time.Second)
-				os.Exit(0)
-			}
-			log.Printf("Timeout: Processed %d messages", messageCount)
+	processedCount := 0
+	for msg := range msgs {
+		log.Printf("Received a message: %s", msg.Body)
+		
+		// Sleep for a random time between 3 and 10 seconds
+		sleepTime := time.Duration(rand.Intn(8)+3) * time.Second
+		log.Printf("Sleeping for %v", sleepTime)
+		time.Sleep(sleepTime)
+		
+		err := msg.Ack(false)
+		if err != nil {
+			log.Printf("Error acknowledging message: %s", err)
+		}
+		
+		processedCount++
+		log.Printf("Processed message %d of %d", processedCount, batchSize)
+		
+		if processedCount >= batchSize {
+			log.Printf("Finished processing %d messages. Exiting.", batchSize)
 			return
 		}
 	}
-}
-
-func processMessage(msg amqp.Delivery) {
-	log.Printf("Received a message: %s", msg.Body)
-	sleepTime := time.Duration(rand.Intn(8)+3) * time.Second
-	time.Sleep(sleepTime)
-	msg.Ack(false)
 }
 
 func failOnError(err error, msg string) {
 	if err != nil {
 		log.Fatalf("%s: %s", msg, err)
 	}
+}
+
+func init() {
+	// Seed the random number generator
+	rand.Seed(time.Now().UnixNano())
 }
