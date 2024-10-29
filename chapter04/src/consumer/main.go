@@ -11,9 +11,11 @@ import (
 )
 
 type Config struct {
-	RabbitMQURL string
-	QueueName   string
-	BatchSize   int
+	RabbitMQURL    string
+	QueueName      string
+	BatchSize      int
+	MaxSleepTime   int
+	TimeoutDuration time.Duration
 }
 
 func main() {
@@ -23,14 +25,16 @@ func main() {
 	defer ch.Close()
 
 	q := declareQueue(ch, config.QueueName)
-	processMessages(ch, q, config.BatchSize)
+	processMessages(ch, q, config)
 }
 
 func loadConfig() Config {
 	return Config{
-		RabbitMQURL: getEnvOrFail("RABBITMQ_URL"),
-		QueueName:   getEnvOrFail("QUEUE_NAME"),
-		BatchSize:   getEnvAsIntOrFail("BATCH_SIZE"),
+		RabbitMQURL:    getEnvOrFail("RABBITMQ_URL"),
+		QueueName:      getEnvOrFail("QUEUE_NAME"),
+		BatchSize:      getEnvAsIntOrFail("BATCH_SIZE"),
+		MaxSleepTime:   getEnvAsIntOrDefault("MAX_SLEEP_TIME", 5),
+		TimeoutDuration: time.Duration(getEnvAsIntOrDefault("TIMEOUT_DURATION", 30)) * time.Second,
 	}
 }
 
@@ -44,6 +48,18 @@ func getEnvOrFail(key string) string {
 
 func getEnvAsIntOrFail(key string) int {
 	value := getEnvOrFail(key)
+	return parseIntOrFail(key, value)
+}
+
+func getEnvAsIntOrDefault(key string, defaultValue int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	return parseIntOrFail(key, value)
+}
+
+func parseIntOrFail(key, value string) int {
 	intValue, err := strconv.Atoi(value)
 	if err != nil {
 		log.Fatalf("Invalid %s value: %s", key, err)
@@ -74,11 +90,11 @@ func declareQueue(ch *amqp.Channel, queueName string) amqp.Queue {
 	return q
 }
 
-func processMessages(ch *amqp.Channel, q amqp.Queue, batchSize int) {
+func processMessages(ch *amqp.Channel, q amqp.Queue, config Config) {
 	err := ch.Qos(
-		batchSize, // prefetch count
-		0,         // prefetch size
-		false,     // global
+		config.BatchSize, // prefetch count
+		0,                // prefetch size
+		false,            // global
 	)
 	failOnError(err, "Failed to set QoS")
 
@@ -94,25 +110,39 @@ func processMessages(ch *amqp.Channel, q amqp.Queue, batchSize int) {
 	failOnError(err, "Failed to register a consumer")
 
 	processedCount := 0
-	for msg := range msgs {
-		log.Printf("Received a message: %s", msg.Body)
-		
-		// Sleep for a random time between 3 and 10 seconds
-		sleepTime := time.Duration(rand.Intn(8)+3) * time.Second
-		log.Printf("Sleeping for %v", sleepTime)
-		time.Sleep(sleepTime)
-		
-		err := msg.Ack(false)
-		if err != nil {
-			log.Printf("Error acknowledging message: %s", err)
-		}
-		
-		processedCount++
-		log.Printf("Processed message %d of %d", processedCount, batchSize)
-		
-		if processedCount >= batchSize {
-			log.Printf("Finished processing %d messages. Exiting.", batchSize)
-			return
+	lastMessageTime := time.Now()
+
+	for {
+		select {
+		case msg, ok := <-msgs:
+			if !ok {
+				log.Println("Channel closed")
+				return
+			}
+			log.Printf("Received a message: %s", msg.Body)
+			
+			// Sleep for a random time between 3 and MaxSleepTime seconds
+			sleepTime := time.Duration(rand.Intn(config.MaxSleepTime-2)+3) * time.Second
+			log.Printf("Sleeping for %v", sleepTime)
+			time.Sleep(sleepTime)
+			
+			err := msg.Ack(false)
+			if err != nil {
+				log.Printf("Error acknowledging message: %s", err)
+			}
+			
+			processedCount++
+			lastMessageTime = time.Now()
+			log.Printf("Processed message %d", processedCount)
+
+		default:
+			// Check if we've exceeded the timeout duration
+			if time.Since(lastMessageTime) > config.TimeoutDuration {
+				log.Printf("No new messages for %v. Processed %d messages. Exiting.", config.TimeoutDuration, processedCount)
+				return
+			}
+			// Sleep briefly to prevent tight looping
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 }

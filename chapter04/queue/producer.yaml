@@ -14,7 +14,7 @@ spec:
         - name: QUEUE_NAME
           value: "autoscaling"
         - name: MESSAGE_COUNT
-          value: "300"
+          value: "150"
         - name: MESSAGE_PREFIX
           value: "Kubernetes Autoscaling with KEDA!"
       restartPolicy: Never

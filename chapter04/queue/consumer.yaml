@@ -30,7 +30,7 @@ spec:
           - name: QUEUE_NAME
             value: "autoscaling"
           - name: BATCH_SIZE
-            value: "10"
+            value: "1"
           resources:
             requests:
               cpu: 300m
@@ -47,14 +47,14 @@ metadata:
 spec:
   scaleTargetRef:
     name: queue-consumer
-  pollingInterval: 5  # Check every 5 seconds
-  cooldownPeriod:  90  # Wait 90 seconds before scaling down
-  maxReplicaCount: 30  # Maximum number of replicas
+  pollingInterval: 5   # Check every 5 seconds
+  cooldownPeriod:  15  # Wait 15 seconds before scaling down
+  maxReplicaCount: 15  # Maximum number of replicas
   triggers:
   - type: rabbitmq
     metadata:
       queueName: autoscaling
-      queueLength: "10"
+      queueLength: "5"
     authenticationRef:
       name: rabbitmq-auth
 ---
