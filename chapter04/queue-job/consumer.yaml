@@ -34,7 +34,7 @@ spec:
               memory: 128Mi
   pollingInterval: 5   # Check every 5 seconds
   maxReplicaCount: 15  # Maximum number of replicas
-  successfulJobsHistoryLimit: 0
+  successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 2
   triggers:
   - type: rabbitmq
