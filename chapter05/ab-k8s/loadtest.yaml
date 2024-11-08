@@ -1,0 +1,18 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: montecarlo-pi-load-test
+spec:
+  template:
+    spec:
+      containers:
+      - name: ab
+        image: christianhxc/ab-tool:latest
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          ab -n 1000000 -c 10 -t 150 http://montecarlo-pi/monte-carlo-pi?iterations=100000
+          echo "Load test completed"
+      restartPolicy: Never
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 30 

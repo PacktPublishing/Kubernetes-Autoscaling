@@ -1,0 +1,20 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: montecarlo-pi-workinghours
+spec:
+  scaleTargetRef:
+    name: montecarlo-pi
+  minReplicaCount: 0
+  maxReplicaCount: 10
+  triggers:
+  - type: cron
+    metadata:
+      timezone: US/Pacific
+      start: 0 8 * * 1-5
+      end: 0 18 * * 1-5
+      desiredReplicas: "1"
+  - type: cpu
+    metricType: Utilization
+    metadata:
+      value: "70"
