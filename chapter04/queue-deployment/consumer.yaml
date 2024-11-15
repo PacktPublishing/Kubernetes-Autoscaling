@@ -54,7 +54,8 @@ spec:
   - type: rabbitmq
     metadata:
       queueName: autoscaling
-      queueLength: "5"
+      mode: QueueLength
+      value: "5"
     authenticationRef:
       name: rabbitmq-auth
 ---
