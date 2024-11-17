@@ -1,0 +1,46 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: queue-consumer-complex
+spec:
+  scaleTargetRef:
+    name: queue-consumer
+  pollingInterval: 5
+  minReplicaCount: 0
+  maxReplicaCount: 15
+  advanced:
+    scalingModifiers:
+      target: "5"
+      formula: "db_write_latency < 100 ? queue : 5"
+  triggers:
+  - type: rabbitmq
+    name: queue
+    metadata:
+      queueName: autoscaling
+      mode: QueueLength
+      value: "5"
+    authenticationRef:
+      name: rabbitmq-auth
+  - type: metrics-api
+    name: db_write_latency
+    metadata:
+      targetValue: "100"
+      url: "http://dummyapi.default.svc.cluster.local/"
+      valueLocation: 'database.metrics.write_latency'
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: rabbitmq-auth
+spec:
+  secretTargetRef:
+    - parameter: host
+      name: rabbitmq-host
+      key: RabbitMqHost
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rabbitmq-host
+data:
+  RabbitMqHost: YW1xcDovL3VzZXI6YXV0b3NjYWxpbmdAcmFiYml0bXEuZGVmYXVsdC5zdmMuY2x1c3Rlci5sb2NhbDo1Njcy

@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dummyapi
+spec:
+  selector:
+    matchLabels:
+      app: dummyapi
+  template:
+    metadata:
+      labels:
+        app: dummyapi
+    spec:
+      containers:
+      - name: dummyapi
+        image: christianhxc/dummyapi
+        ports:
+        - name: http
+          containerPort: 8080
+        resources:
+          requests:
+            cpu: 250m
+            memory: 128Mi
+        env:
+        - name: DUMMY_VALUE
+          value: "42"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dummyapi
+  labels:
+    app: dummyapi
+spec:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: dummyapi

@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: queue-consumer
+  labels:
+    app: queue-consumer
+spec:
+  selector:
+    matchLabels:
+      app: queue-consumer
+  template:
+    metadata:
+      labels:
+        app: queue-consumer
+    spec:
+      containers:
+        - name: consumer
+          image: christianhxc/rabbitmq-consumer:latest
+          imagePullPolicy: Always
+          env:
+          - name: RABBITMQ_URL
+            value: "amqp://user:autoscaling@rabbitmq.default.svc.cluster.local:5672"
+          - name: QUEUE_NAME
+            value: "autoscaling"
+          - name: BATCH_SIZE
+            value: "1"
+          resources:
+            requests:
+              cpu: 300m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
