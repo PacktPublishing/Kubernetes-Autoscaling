@@ -144,7 +144,7 @@ module "eks_blueprints_addons" {
 
   enable_metrics_server = true
 
-  # enable_cluster_autoscaler = true
+  enable_cluster_autoscaler = false
 
   eks_addons = {
     aws-ebs-csi-driver = {
