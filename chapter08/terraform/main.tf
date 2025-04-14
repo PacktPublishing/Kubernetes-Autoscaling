@@ -62,24 +62,34 @@ data "aws_ecrpublic_authorization_token" "token" {
 
 data "aws_partition" "current" {}
 data "aws_caller_identity" "current" {}
-data "aws_availability_zones" "available" {}
 
 variable "region" {
   description = "Region to deploy the resources"
   type        = string
 }
 
+data "aws_availability_zones" "available" {
+  filter {
+    name   = "opt-in-status"
+    values = ["opt-in-not-required"]
+  }
+}
+
 locals {
   name   = "kubernetes-autoscaling"
   region = var.region
 
-  cluster_version = "1.31"
+  cluster_version = "1.32"
+  node_group_name = "managed-ondemand"
+
+  node_iam_role_name = module.eks_blueprints_addons.karpenter.node_iam_role_name
 
   vpc_cidr = "10.0.0.0/16"
-  azs      = slice(data.aws_availability_zones.available.names, 0, 3)
+  # NOTE: You might need to change this less number of AZs depending on the region you're deploying to
+  azs = slice(data.aws_availability_zones.available.names, 0, 3)
 
   tags = {
-    Blueprint = local.name
+    blueprint = local.name
   }
 }
 
@@ -88,71 +98,29 @@ locals {
 ################################################################################
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "20.8.3"
+  version = "20.33.1"
 
   cluster_name                   = local.name
   cluster_version                = local.cluster_version
   cluster_endpoint_public_access = true
 
-  vpc_id     = module.vpc.vpc_id
-  subnet_ids = module.vpc.private_subnets
-
-  create_cloudwatch_log_group              = false
-  create_cluster_security_group            = false
-  create_node_security_group               = false
-  authentication_mode                      = "API_AND_CONFIG_MAP"
-  enable_cluster_creator_admin_permissions = true
-
-  eks_managed_node_groups = {
-    managed-ondemand = {
-      node_group_name = "managed-ondemand"
-      instance_types  = ["m6g.xlarge", "m6gd.xlarge", "m7g.xlarge", "c6g.xlarge", "c6gd.xlarge", "c7g.xlarge"]
-
-      create_security_group = false
-
-      subnet_ids   = module.vpc.private_subnets
-      max_size     = 10
-      desired_size = 2
-      min_size     = 2
-
-      # Launch template configuration
-      ami_type               = "BOTTLEROCKET_ARM_64"
-      create_launch_template = true # false will use the default launch template
-      launch_template_os     = "bottlerocket"
-
-      labels = {
-        intent = "control-apps"
-      }
-    }
-  }
-
-  tags = merge(local.tags, {
-    "karpenter.sh/discovery" = local.name
-  })
-}
-
-module "eks_blueprints_addons" {
-  source  = "aws-ia/eks-blueprints-addons/aws"
-  version = "1.16.3"
-
-  cluster_name      = module.eks.cluster_name
-  cluster_endpoint  = module.eks.cluster_endpoint
-  cluster_version   = module.eks.cluster_version
-  oidc_provider_arn = module.eks.oidc_provider_arn
-
-  create_delay_dependencies = [for prof in module.eks.eks_managed_node_groups : prof.node_group_arn]
-
-  enable_metrics_server = true
-
-  enable_cluster_autoscaler = false
-
-  eks_addons = {
-    aws-ebs-csi-driver = {
-      service_account_role_arn = module.ebs_csi_driver_irsa.iam_role_arn
+  cluster_addons = {
+    coredns = {
+      configuration_values = jsonencode({
+        tolerations = [
+          # Allow CoreDNS to run on the same nodes as the Karpenter controller
+          # for use during cluster creation when Karpenter nodes do not yet exist
+          {
+            key    = "karpenter.sh/controller"
+            value  = "true"
+            effect = "NoSchedule"
+          }
+        ]
+      })
     }
 
-    kube-proxy = { most_recent = true }
-    coredns    = { most_recent = true }
+    eks-pod-identity-agent = {}
+    kube-proxy             = { most_recent = true }
 
     vpc-cni = {
       most_recent    = true
@@ -166,94 +134,52 @@ module "eks_blueprints_addons" {
     }
   }
 
-  tags = local.tags
-}
+  vpc_id     = module.vpc.vpc_id
+  subnet_ids = module.vpc.private_subnets
 
-module "eks_blueprints_addons_load_balancer_controller" {
-  source  = "aws-ia/eks-blueprints-addons/aws"
-  version = "1.16.3"
+  create_cloudwatch_log_group              = false
+  create_cluster_security_group            = false
+  create_node_security_group               = false
+  authentication_mode                      = "API_AND_CONFIG_MAP"
+  enable_cluster_creator_admin_permissions = true
 
-  cluster_name      = module.eks.cluster_name
-  cluster_endpoint  = module.eks.cluster_endpoint
-  cluster_version   = module.eks.cluster_version
-  oidc_provider_arn = module.eks.oidc_provider_arn
+  eks_managed_node_groups = {
+    karpenter = {
+      node_group_name = "karpenter"
+      instance_types  = ["m6g.large", "m6gd.large", "m7g.large", "c6g.large", "c6gd.large", "c7g.large"]
 
-  enable_aws_load_balancer_controller = true
-  aws_load_balancer_controller = {
-    chart_version = "1.8.2"
-  }
+      create_security_group = false
 
-  tags = local.tags
+      subnet_ids   = module.vpc.private_subnets
+      max_size     = 2
+      desired_size = 2
+      min_size     = 2
 
-  depends_on = [module.eks_blueprints_addons]
-}
+      # Launch template configuration
+      create_launch_template = true # false will use the default launch template
+      launch_template_os     = "bottlerocket"
+      ami_type               = "BOTTLEROCKET_ARM_64"
 
-module "ebs_csi_driver_irsa" {
-  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "5.44.0"
+      labels = {
+        intent                    = "control-apps",
+        "karpenter.sh/controller" = "true"
+      }
 
-  role_name_prefix = "${module.eks.cluster_name}-ebs-csi-driver-"
-
-  attach_ebs_csi_policy = true
-
-  oidc_providers = {
-    main = {
-      provider_arn               = module.eks.oidc_provider_arn
-      namespace_service_accounts = ["kube-system:ebs-csi-controller-sa"]
+      taints = {
+        # The pods that do not tolerate this taint should run on nodes
+        # created by Karpenter
+        karpenter = {
+          key    = "karpenter.sh/controller"
+          value  = "true"
+          effect = "NO_SCHEDULE"
+        }
+      }
     }
   }
 
-  tags = local.tags
-}
-
-################################################################################
-# Storage Classes
-################################################################################
-
-resource "kubernetes_annotations" "gp2" {
-  api_version = "storage.k8s.io/v1"
-  kind        = "StorageClass"
-  # This is true because the resources was already created by the ebs-csi-driver addon
-  force = "true"
-
-  metadata {
-    name = "gp2"
-  }
-
-  annotations = {
-    # Modify annotations to remove gp2 as default storage class still retain the class
-    "storageclass.kubernetes.io/is-default-class" = "false"
-  }
-
-  depends_on = [
-    module.eks_blueprints_addons
-  ]
-}
-
-resource "kubernetes_storage_class_v1" "gp3" {
-  metadata {
-    name = "gp3"
-
-    annotations = {
-      # Annotation to set gp3 as default storage class
-      "storageclass.kubernetes.io/is-default-class" = "true"
-    }
-  }
-
-  storage_provisioner    = "ebs.csi.aws.com"
-  allow_volume_expansion = true
-  reclaim_policy         = "Delete"
-  volume_binding_mode    = "WaitForFirstConsumer"
-
-  parameters = {
-    encrypted = true
-    fsType    = "ext4"
-    type      = "gp3"
-  }
-
-  depends_on = [
-    module.eks_blueprints_addons
-  ]
+  tags = merge(local.tags, {
+    "karpenter.sh/discovery" = local.name
+  })
 }
 
 #---------------------------------------------------------------
@@ -262,7 +188,7 @@ resource "kubernetes_storage_class_v1" "gp3" {
 
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
-  version = "5.6.0"
+  version = "5.12.1"
 
   name = local.name
   cidr = local.vpc_cidr
@@ -295,19 +221,6 @@ module "vpc" {
   }
 
   tags = local.tags
-}
-
-resource "aws_s3_bucket" "codepipeline_eks_bucket" {
-  bucket = "${local.region}-${data.aws_caller_identity.current.account_id}-${local.name}-codepipeline-eks"
-}
-
-resource "aws_s3_bucket_public_access_block" "codepipeline_eks_bucket_pab" {
-  bucket = aws_s3_bucket.codepipeline_eks_bucket.id
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
 }
 
 #---------------------------------------------------------------

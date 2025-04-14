@@ -116,7 +116,7 @@ module "eks" {
       min_size     = 2
 
       # Launch template configuration
-      ami_type               = "AL2_ARM_64"
+      ami_type               = "BOTTLEROCKET_ARM_64"
       create_launch_template = true # false will use the default launch template
       launch_template_os     = "bottlerocket"
 
