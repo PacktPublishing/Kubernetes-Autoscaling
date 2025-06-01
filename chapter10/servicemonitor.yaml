@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: karpenter
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: karpenter
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: karpenter
+  namespaceSelector:
+    matchNames:
+    - karpenter
+  endpoints:
+  - port: http-metrics
+    path: /metrics
+    interval: 30s
