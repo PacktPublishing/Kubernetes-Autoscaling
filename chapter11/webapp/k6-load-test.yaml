@@ -1,0 +1,17 @@
+apiVersion: k6.io/v1alpha1
+kind: TestRun
+metadata:
+  name: montecarlo-load-test
+spec:
+  quiet: "false"
+  cleanup: post
+  parallelism: 1
+  script:
+    configMap:
+      name: k6-load-test-script
+      file: k6-script.js
+  runner:
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "512Mi"
