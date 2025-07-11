@@ -4,6 +4,9 @@ metadata:
   name: scaling-tests
 spec:
   template:
+    metadata:
+      labels:
+        intent: scaling-tests
     spec:
       requirements:
         - key: kubernetes.io/arch

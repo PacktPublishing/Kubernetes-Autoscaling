@@ -24,6 +24,8 @@ spec:
           limits: # we're limiting to force latency to go up
             cpu: 900m
             memory: 512Mi
+      nodeSelector:
+        intent: scaling-tests
       tolerations:
       - key: scaling-tests
         operator: Exists
