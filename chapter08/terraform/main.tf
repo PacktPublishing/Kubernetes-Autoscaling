@@ -89,7 +89,7 @@ module "eks" {
   version = "20.37.0"
 
   cluster_name                             = local.name
-  cluster_version                          = "1.32"
+  cluster_version                          = "1.33"
   cluster_endpoint_public_access           = true
   enable_cluster_creator_admin_permissions = true
 
@@ -105,9 +105,6 @@ module "eks" {
       most_recent    = true
     }
     kube-proxy = {
-      most_recent = true
-    }
-    metrics-server = {
       most_recent = true
     }
     vpc-cni = {
@@ -140,15 +137,6 @@ module "eks" {
         # Used to ensure Karpenter runs on nodes that it does not manage
         "karpenter.sh/controller" = "true"
       }
-
-      taints = {
-        # The pods that do not tolerate this taint should run on nodes created by Karpenter
-        karpenter = {
-          key    = "karpenter.sh/controller"
-          value  = "true"
-          effect = "NO_SCHEDULE"
-        }
-      }
     }
   }
 
@@ -174,6 +162,7 @@ module "eks_blueprints_addons" {
   create_delay_dependencies = [for grp in module.eks.eks_managed_node_groups : grp.node_group_arn]
 
   enable_aws_load_balancer_controller = true
+  enable_metrics_server               = true
 
   enable_aws_for_fluentbit = true
   aws_for_fluentbit = {
