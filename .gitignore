@@ -1,3 +1,7 @@
 .DS_Store
 .terraform*
 terraform.tfstate*
+k6.tf
+monitoring.tf
+karpenter.tf
+keda.tf
