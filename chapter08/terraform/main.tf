@@ -96,6 +96,10 @@ module "eks" {
   cluster_addons = {
     aws-ebs-csi-driver = {
       most_recent = true
+      pod_identity_association = [{
+        role_arn        = module.aws_ebs_csi_pod_identity.iam_role_arn
+        service_account = "ebs-csi-controller-sa"
+      }]
     }
     coredns = {
       most_recent = true
@@ -185,19 +189,33 @@ module "aws_ebs_csi_pod_identity" {
 
   attach_aws_ebs_csi_policy = true
 
-  # Pod Identity Associations
-  association_defaults = {
-    namespace       = "kube-system"
-    service_account = "ebs-csi-controller-sa"
-  }
+  tags = local.tags
+}
 
-  associations = {
-    default = {
-      cluster_name = module.eks.cluster_name
+resource "kubernetes_storage_class_v1" "gp3" {
+  metadata {
+    name = "gp3"
+
+    annotations = {
+      # Annotation to set gp3 as default storage class
+      "storageclass.kubernetes.io/is-default-class" = "true"
     }
   }
 
-  tags = local.tags
+  storage_provisioner    = "ebs.csi.aws.com"
+  allow_volume_expansion = true
+  reclaim_policy         = "Delete"
+  volume_binding_mode    = "WaitForFirstConsumer"
+
+  parameters = {
+    encrypted = true
+    fsType    = "ext4"
+    type      = "gp3"
+  }
+
+  depends_on = [
+    module.eks_blueprints_addons
+  ]
 }
 
 #---------------------------------------------------------------
