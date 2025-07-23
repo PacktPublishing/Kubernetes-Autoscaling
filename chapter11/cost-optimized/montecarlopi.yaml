@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montecarlo-pi
+spec:
+  replicas: 10
+  selector:
+    matchLabels:
+      app: montecarlo-pi
+  template:
+    metadata:
+      labels:
+        app: montecarlo-pi
+    spec:      
+      containers:
+      - name: montecarlo-pi
+        image: christianhxc/montecarlo-pi
+        ports:
+        - name: http
+          containerPort: 8080
+        resources:
+          requests:
+            cpu: 1
+            memory: 512Mi
+      nodeSelector:
+        intent: scaling-tests
+      tolerations:
+      - key: scaling-tests
+        operator: Exists
