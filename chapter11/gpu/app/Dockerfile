@@ -6,18 +6,20 @@ ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
-    python3-dev \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y python3-pip python3-venv
 
 # Create working directory
 WORKDIR /app
 
-# Copy requirements and install Python dependencies
+# Create a virtual environment
+RUN python3 -m venv /opt/venv
+
+# Activate it, and install dependencies inside
+ENV PATH="/opt/venv/bin:$PATH"
+
 COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY main.py .
