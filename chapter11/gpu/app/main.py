@@ -6,7 +6,7 @@ import requests
 from io import BytesIO
 
 from flask import Flask, request, jsonify
-from prometheus_client import Counter, Histogram, Gauge, generate_http_server
+from prometheus_client import Counter, Histogram, Gauge, start_http_server
 import torch
 from torchvision.models import resnet18, ResNet18_Weights
 import torchvision.transforms as transforms
