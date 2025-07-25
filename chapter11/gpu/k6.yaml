@@ -1,122 +1,18 @@
-apiVersion: batch/v1
-kind: Job
+apiVersion: k6.io/v1alpha1
+kind: TestRun
 metadata:
   name: gpu-inference-load-test
 spec:
-  template:
-    spec:
-      containers:
-      - name: k6
-        image: grafana/k6:latest
-        command: ["k6", "run", "/scripts/k6-load-test.js"]
-        env:
-        - name: K6_OUT
-          value: "experimental-prometheus-rw"
-        - name: K6_PROMETHEUS_RW_SERVER_URL
-          value: "http://prometheus-operated.monitoring.svc.cluster.local:9090/api/v1/write"
-        volumeMounts:
-        - name: k6-script
-          mountPath: /scripts
-        resources:
-          requests:
-            memory: "512Mi"
-            cpu: "100m"
-          limits:
-            memory: "512Mi"
-      volumes:
-      - name: k6-script
-        configMap:
-          name: gpu-inference-load-test-script
-      restartPolicy: Never
-  backoffLimit: 4
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: gpu-inference-load-test-script
-data:
-  k6-load-test.js: |
-    import http from 'k6/http';
-    import { check, sleep } from 'k6';
-    import { Rate } from 'k6/metrics';
-
-    const errorRate = new Rate('errors');
-
-    export const options = {
-      scenarios: {
-        load_test: {
-          executor: 'ramping-vus',
-          startVUs: 0,
-          stages: [
-            { duration: '30s', target: 5 },    // Ramp up to 5 users
-            { duration: '1m',  target: 5 },    // Hold at 5 users
-            { duration: '30s', target: 12 },   // Ramp up to 12 users
-            { duration: '1m',  target: 12 },   // Hold at 12 users
-            { duration: '30s', target: 20 },   // Spike to 20 users (maximum)
-            { duration: '1m',  target: 20 },   // Hold at 20 users
-            { duration: '30s', target: 0 },    // Ramp down to 0 users
-          ],
-          gracefulStop: '10s',
-          tags: { phase: 'load_test' },
-        },
-      },
-      thresholds: {
-        http_req_duration: ['p(95)<3000'],
-        http_req_failed: ['rate<0.05'],
-        checks: ['rate>0.95'],
-      },
-    };
-
-    const BASE_URL = 'http://gpu-inference-service.default.svc.cluster.local';
-    const testImageData = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
-
-    export default function () {
-      const healthResponse = http.get(`${BASE_URL}/health`);
-      check(healthResponse, {
-        'health status 200': (r) => r.status === 200,
-      }) || errorRate.add(1);
-
-      const formData = {
-        image: http.file(testImageData, 'test.png', 'image/png', { encoding: 'base64' }),
-      };
-
-      const predictionResponse = http.post(`${BASE_URL}/predict`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      const success = check(predictionResponse, {
-        'prediction status 200': (r) => r.status === 200,
-        'prediction response valid': (r) => {
-          try {
-            const json = JSON.parse(r.body);
-            return json.predicted_class !== undefined;
-          } catch {
-            return false;
-          }
-        },
-      });
-
-      if (!success) {
-        errorRate.add(1);
-      }
-
-      sleep(1);
-    }
-
-    export function setup() {
-      console.log('Starting compressed ~5-minute GPU inference load test, capped at 20 users.');
-      const healthCheck = http.get(`${BASE_URL}/health`);
-      if (healthCheck.status !== 200) {
-        console.error('Service health check failed, aborting test');
-        return null;
-      }
-      console.log('Service health check passed, proceeding');
-      return {};
-    }
-
-    export function teardown() {
-      console.log('Load test completed');
-    }
-
+  quiet: "false"
+  cleanup: post
+  parallelism: 1
+  script:
+    localFile: /scripts/k6-load-test.js
+  runner:
+    image: christianhxc/k6-gpu-test:latest
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "512Mi"
+      limits:
+        memory: "512Mi"
