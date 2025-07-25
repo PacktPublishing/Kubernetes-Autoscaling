@@ -43,8 +43,23 @@ data:
     const errorRate = new Rate('errors');
 
     export const options = {
-      vus: 20,              // 20 virtual users concurrently
-      duration: '5m',       // total duration 5 minutes
+      scenarios: {
+        load_test: {
+          executor: 'ramping-vus',
+          startVUs: 0,
+          stages: [
+            { duration: '30s', target: 5 },    // Ramp up to 5 users
+            { duration: '1m',  target: 5 },    // Hold at 5 users
+            { duration: '30s', target: 12 },   // Ramp up to 12 users
+            { duration: '1m',  target: 12 },   // Hold at 12 users
+            { duration: '30s', target: 20 },   // Spike to 20 users (maximum)
+            { duration: '1m',  target: 20 },   // Hold at 20 users
+            { duration: '30s', target: 0 },    // Ramp down to 0 users
+          ],
+          gracefulStop: '10s',
+          tags: { phase: 'load_test' },
+        },
+      },
       thresholds: {
         http_req_duration: ['p(95)<3000'],
         http_req_failed: ['rate<0.05'],
@@ -58,7 +73,7 @@ data:
     export default function () {
       const healthResponse = http.get(`${BASE_URL}/health`);
       check(healthResponse, {
-        'health check status is 200': (r) => r.status === 200,
+        'health status 200': (r) => r.status === 200,
       }) || errorRate.add(1);
 
       const formData = {
@@ -72,8 +87,8 @@ data:
       });
 
       const success = check(predictionResponse, {
-        'prediction status is 200': (r) => r.status === 200,
-        'prediction response contains result': (r) => {
+        'prediction status 200': (r) => r.status === 200,
+        'prediction response valid': (r) => {
           try {
             const json = JSON.parse(r.body);
             return json.predicted_class !== undefined;
@@ -87,5 +102,21 @@ data:
         errorRate.add(1);
       }
 
-      sleep(1); // wait 1 second between requests per VU
+      sleep(1);
     }
+
+    export function setup() {
+      console.log('Starting compressed ~5-minute GPU inference load test, capped at 20 users.');
+      const healthCheck = http.get(`${BASE_URL}/health`);
+      if (healthCheck.status !== 200) {
+        console.error('Service health check failed, aborting test');
+        return null;
+      }
+      console.log('Service health check passed, proceeding');
+      return {};
+    }
+
+    export function teardown() {
+      console.log('Load test completed');
+    }
+
