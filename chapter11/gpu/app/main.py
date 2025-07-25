@@ -100,26 +100,50 @@ def predict():
     active_requests.inc()
     try:
         if not model:
+            logger.error("Model not loaded")
             request_count.labels(endpoint='/predict', method=request.method, status='500').inc()
             return jsonify({"error": "Model not loaded"}), 500
+        
+        # Check proper image upload field
         if 'image' not in request.files:
+            logger.error("No 'image' field in request.files")
             request_count.labels(endpoint='/predict', method=request.method, status='400').inc()
             return jsonify({"error": "No image provided"}), 400
+
         file = request.files['image']
         if file.filename == '':
+            logger.error("Empty filename for uploaded image")
             request_count.labels(endpoint='/predict', method=request.method, status='400').inc()
             return jsonify({"error": "No image selected"}), 400
 
-        image = Image.open(io.BytesIO(file.read())).convert('RGB')
+        file_content = file.read()
+        if not file_content:
+            logger.error("Uploaded image file is empty")
+            request_count.labels(endpoint='/predict', method=request.method, status='400').inc()
+            return jsonify({"error": "Empty file content"}), 400
+
+        logger.info(f"Received image file size: {len(file_content)} bytes")
+        file.stream.seek(0)  # Reset stream position after read
+
+        # Decode image safely
+        try:
+            image = Image.open(file.stream).convert('RGB')
+        except Exception as e:
+            logger.error(f"Invalid image file: {e}")
+            request_count.labels(endpoint='/predict', method=request.method, status='400').inc()
+            return jsonify({"error": "Invalid image file"}), 400
+
         image_tensor = transform(image).unsqueeze(0).to(device)
         result = simulate_gpu_inference(image_tensor)
 
         request_count.labels(endpoint='/predict', method=request.method, status='200').inc()
-        return jsonify(result)
+        return jsonify(result), 200
+
     except Exception as e:
-        logger.error(f"Prediction error: {str(e)}")
+        logger.exception(f"Prediction error: {str(e)}")
         request_count.labels(endpoint='/predict', method=request.method, status='500').inc()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Internal server error"}), 500
+
     finally:
         active_requests.dec()
         request_latency.labels(endpoint='/predict').observe(time.time() - start_time)
