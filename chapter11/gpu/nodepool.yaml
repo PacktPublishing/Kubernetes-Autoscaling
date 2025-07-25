@@ -18,6 +18,9 @@ spec:
       - key: karpenter.k8s.aws/instance-gpu-manufacturer
         operator: In
         values: ["nvidia"]
+      - key: kubernetes.io/arch
+        operator: In
+        values: ["amd64"]
       taints:
       - key: nvidia.com/gpu
         value: "true"
