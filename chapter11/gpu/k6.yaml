@@ -4,6 +4,7 @@ metadata:
   name: gpu-inference-load-test
 spec:
   quiet: "false"
+  cleanup: post
   parallelism: 1
   script:
     configMap:
@@ -30,7 +31,6 @@ data:
       'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800',  // Office
       'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=800',  // Nature
       'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800',  // Portrait
-      'https://images.unsplash.com/photo-1517737129300-f59f78b11aa2?w=800',  // Architecture
     ];
 
     export const options = {
