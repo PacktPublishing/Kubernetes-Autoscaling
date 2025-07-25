@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: image-processing-app
+  namespace: default
+  labels:
+    app: image-processing-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: image-processing-app
+  template:
+    metadata:
+      labels:
+        app: image-processing-app
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+      - key: nvidia.com/gpu
+        effect: NoSchedule
+        operator: Exists
+      containers:
+      - name: image-processing-app
+        image: christianhxc/image-processing-app:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5000
+          name: http
+        - containerPort: 8080
+          name: metrics
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+            memory: "2Gi"
+          requests:
+            nvidia.com/gpu: 1
+            memory: "2Gi"
+            cpu: "1"
+        env:
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gpu-inference-service
+  labels:
+    app: image-processing-app
+spec:
+  selector:
+    app: image-processing-app
+  ports:
+  - name: http
+    port: 80
+    targetPort: 5000
+    protocol: TCP
+  - name: metrics
+    port: 8080
+    targetPort: 8080
+    protocol: TCP

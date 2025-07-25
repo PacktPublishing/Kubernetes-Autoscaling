@@ -1,0 +1,54 @@
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: gpu
+spec:
+  template:
+    metadata:
+      labels:
+        nvidia.com/gpu.present: "true"
+    spec:
+      requirements:
+      - key: karpenter.sh/capacity-type
+        operator: In
+        values: ["spot", "on-demand"]
+      - key: karpenter.k8s.aws/instance-category
+        operator: In
+        values: ["g", "p"]
+      - key: karpenter.k8s.aws/instance-gpu-manufacturer
+        operator: In
+        values: ["nvidia"]
+      taints:
+      - key: nvidia.com/gpu
+        value: "true"
+        effect: NoSchedule
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: gpu
+  disruption:
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 5m
+---
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: gpu
+spec:
+  amiSelectorTerms:
+  - alias: "al2023@latest"
+  role: "kubernetes-autoscaling"
+  subnetSelectorTerms:
+  - tags:
+      karpenter.sh/discovery: "kubernetes-autoscaling"
+  securityGroupSelectorTerms:
+  - tags:
+      karpenter.sh/discovery: "kubernetes-autoscaling"
+  blockDeviceMappings:
+  - deviceName: /dev/xvda
+    ebs:
+      deleteOnTermination: true
+      iops: 10000
+      throughput: 125
+      volumeSize: 100Gi
+      volumeType: gp3
