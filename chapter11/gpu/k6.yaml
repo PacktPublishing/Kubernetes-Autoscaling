@@ -4,15 +4,97 @@ metadata:
   name: gpu-inference-load-test
 spec:
   quiet: "false"
-  cleanup: post
   parallelism: 1
   script:
-    localFile: /scripts/k6-load-test.js
+    configMap:
+      name: gpu-inference-load-test-script
+      file: k6-load-test.js
   runner:
-    image: christianhxc/k6-gpu-test:latest
     resources:
       requests:
         cpu: "500m"
         memory: "512Mi"
-      limits:
-        memory: "512Mi"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gpu-inference-load-test-script
+data:
+  k6-load-test.js: |
+    import http from 'k6/http';
+    import { check, sleep } from 'k6';
+
+    // Array of public image URLs to test with
+    const imageUrls = [
+      'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800',  // Landscape
+      'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800',  // Office
+      'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=800',  // Nature
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800',  // Portrait
+      'https://images.unsplash.com/photo-1517737129300-f59f78b11aa2?w=800',  // Architecture
+    ];
+
+    export const options = {
+      scenarios: {
+        load_test: {
+          executor: 'ramping-vus',
+          startVUs: 0,
+          stages: [
+            { duration: '30s', target: 10 },
+            { duration: '1m',  target: 25 },
+            { duration: '1m',  target: 50 },
+            { duration: '1m',  target: 50 },
+            { duration: '30s', target: 20 },
+            { duration: '30s', target: 0 },
+          ],
+          gracefulStop: '10s',
+        },
+      },
+      thresholds: {
+        http_req_duration: ['p(95)<5000'],
+        checks: ['rate>0.90'],
+      },
+    };
+
+    export default function () {
+      // Select a random image URL from the array
+      const randomImageUrl = imageUrls[Math.floor(Math.random() * imageUrls.length)];
+      
+      // Create JSON payload with image URL
+      const payload = JSON.stringify({
+        image_url: randomImageUrl
+      });
+
+      const params = {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      };
+
+      const response = http.post(
+        'http://gpu-inference-service.default.svc.cluster.local/predict', 
+        payload, 
+        params
+      );
+
+      check(response, {
+        'prediction status is 200': (r) => r.status === 200,
+        'response contains prediction': (r) => {
+          try {
+            const json = JSON.parse(r.body);
+            return json.predicted_class !== undefined && json.confidence !== undefined;
+          } catch {
+            return false;
+          }
+        },
+        'response contains source URL': (r) => {
+          try {
+            const json = JSON.parse(r.body);
+            return json.source_url !== undefined;
+          } catch {
+            return false;
+          }
+        }
+      });
+
+      sleep(1);
+    }

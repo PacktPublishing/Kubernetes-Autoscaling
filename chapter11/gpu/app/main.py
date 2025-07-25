@@ -2,16 +2,15 @@ import os
 import time
 import logging
 import threading
-import io
+import requests
+from io import BytesIO
 
 from flask import Flask, request, jsonify
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, start_http_server
+from prometheus_client import Counter, Histogram, Gauge, generate_http_server
 import torch
 from torchvision.models import resnet18, ResNet18_Weights
 import torchvision.transforms as transforms
 from PIL import Image
-
-from io import BytesIO
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -19,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Prometheus metrics
+# Prometheus metrics (existing ones)
 request_count = Counter(
     'gpu_inference_requests_total', 
     'Total number of inference requests', 
@@ -51,7 +50,6 @@ def setup_gpu():
     """Initialize and load model"""
     global device, model, transform
 
-    # Check if CUDA is available
     if torch.cuda.is_available():
         device = torch.device("cuda")
         logger.info(f"Using GPU: {torch.cuda.get_device_name(0)}")
@@ -59,9 +57,8 @@ def setup_gpu():
         device = torch.device("cpu")
         logger.info("CUDA not available, using CPU")
 
-    # Load ResNet18 model using modern weights API (pretrained argument deprecated)
     start_time = time.time()
-    weights = ResNet18_Weights.DEFAULT  # You can pick IMAGENET1K_V1 or DEFAULT
+    weights = ResNet18_Weights.DEFAULT
     model = resnet18(weights=weights)
     model = model.to(device)
     model.eval()
@@ -69,17 +66,14 @@ def setup_gpu():
     gpu_model_load_time.observe(load_time)
     model_loaded.set(1)
 
-    # Define image transforms (from weights' preprocessing)
     transform = weights.transforms()
     logger.info(f"Model loaded on {device} in {load_time:.2f} seconds")
 
 def simulate_gpu_inference(image_tensor):
     """Simulate GPU-intensive inference"""
     with torch.no_grad():
-        # Artificial compute load to simulate GPU usage
         for _ in range(10):
             _ = torch.matmul(image_tensor, image_tensor.transpose(-2, -1))
-        # Actual model inference
         output = model(image_tensor)
         probabilities = torch.nn.functional.softmax(output[0], dim=0)
         top_prob, top_class = torch.topk(probabilities, 1)
@@ -89,6 +83,31 @@ def simulate_gpu_inference(image_tensor):
         "device_used": str(image_tensor.device)
     }
 
+def download_image_from_url(image_url, timeout=10):
+    """Download image from URL and return PIL Image object"""
+    try:
+        response = requests.get(image_url, timeout=timeout, stream=True)
+        response.raise_for_status()
+        
+        # Check content type
+        content_type = response.headers.get('content-type', '')
+        if not content_type.startswith('image/'):
+            raise ValueError(f"URL does not point to an image. Content-Type: {content_type}")
+        
+        # Load image from response content
+        image_stream = BytesIO(response.content)
+        image = Image.open(image_stream).convert('RGB')
+        
+        logger.info(f"Successfully downloaded image from URL: {image_url}, size: {len(response.content)} bytes")
+        return image
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to download image from URL {image_url}: {e}")
+        raise ValueError(f"Failed to download image: {str(e)}")
+    except Exception as e:
+        logger.error(f"Failed to process image from URL {image_url}: {e}")
+        raise ValueError(f"Invalid image data: {str(e)}")
+
 @app.route('/health')
 def health():
     """Health check endpoint"""
@@ -97,46 +116,42 @@ def health():
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    """Main prediction endpoint"""
+    """Main prediction endpoint that accepts image URL"""
     start_time = time.time()
     active_requests.inc()
+    
     try:
         if not model:
             logger.error("Model not loaded")
             request_count.labels(endpoint='/predict', method=request.method, status='500').inc()
             return jsonify({"error": "Model not loaded"}), 500
 
-        if 'image' not in request.files:
-            logger.error("No 'image' field in request.files")
+        # Get image URL from JSON payload
+        data = request.get_json()
+        if not data or 'image_url' not in data:
+            logger.error("No 'image_url' field in request JSON")
             request_count.labels(endpoint='/predict', method=request.method, status='400').inc()
-            return jsonify({"error": "No image provided"}), 400
+            return jsonify({"error": "Missing 'image_url' field in JSON payload"}), 400
 
-        file = request.files['image']
-        if file.filename == '':
-            logger.error("Empty filename for uploaded image")
+        image_url = data['image_url']
+        if not image_url or not image_url.strip():
+            logger.error("Empty image_url provided")
             request_count.labels(endpoint='/predict', method=request.method, status='400').inc()
-            return jsonify({"error": "No image selected"}), 400
+            return jsonify({"error": "Empty image_url provided"}), 400
 
-        file_content = file.read()
-        if not file_content:
-            logger.error("Uploaded image file is empty")
-            request_count.labels(endpoint='/predict', method=request.method, status='400').inc()
-            return jsonify({"error": "Empty file content"}), 400
-
-        logger.info(f"Received image file size: {len(file_content)} bytes")
-
-        # Use BytesIO to create an in-memory stream for safe PIL decoding
-        image_stream = BytesIO(file_content)
+        # Download and process image
         try:
-            image = Image.open(image_stream).convert('RGB')
-        except Exception as e:
-            logger.error(f"Invalid image file: {e}")
+            image = download_image_from_url(image_url)
+        except ValueError as e:
             request_count.labels(endpoint='/predict', method=request.method, status='400').inc()
-            return jsonify({"error": "Invalid image file"}), 400
+            return jsonify({"error": str(e)}), 400
 
         image_tensor = transform(image).unsqueeze(0).to(device)
         result = simulate_gpu_inference(image_tensor)
-
+        
+        # Add source URL to result
+        result['source_url'] = image_url
+        
         request_count.labels(endpoint='/predict', method=request.method, status='200').inc()
         return jsonify(result), 200
 
