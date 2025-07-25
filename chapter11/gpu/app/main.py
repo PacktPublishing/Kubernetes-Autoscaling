@@ -103,8 +103,7 @@ def predict():
             logger.error("Model not loaded")
             request_count.labels(endpoint='/predict', method=request.method, status='500').inc()
             return jsonify({"error": "Model not loaded"}), 500
-        
-        # Check proper image upload field
+
         if 'image' not in request.files:
             logger.error("No 'image' field in request.files")
             request_count.labels(endpoint='/predict', method=request.method, status='400').inc()
@@ -123,11 +122,11 @@ def predict():
             return jsonify({"error": "Empty file content"}), 400
 
         logger.info(f"Received image file size: {len(file_content)} bytes")
-        file.stream.seek(0)  # Reset stream position after read
 
-        # Decode image safely
+        # Use BytesIO to create an in-memory stream for safe PIL decoding
+        image_stream = BytesIO(file_content)
         try:
-            image = Image.open(file.stream).convert('RGB')
+            image = Image.open(image_stream).convert('RGB')
         except Exception as e:
             logger.error(f"Invalid image file: {e}")
             request_count.labels(endpoint='/predict', method=request.method, status='400').inc()
