@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: image-processing-app
+  labels:
+    app: image-processing-app
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: image-processing-app
+  endpoints:
+  - port: metrics
+    interval: 15s
+    path: /metrics
+    scheme: http

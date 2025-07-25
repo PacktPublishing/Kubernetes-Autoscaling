@@ -1,0 +1,49 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: image-processing-app
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: image-processing-app
+  pollingInterval: 15  # Check metrics every 15 seconds
+  cooldownPeriod: 300  # Wait 5 minutes before scaling down
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 60
+          policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 60
+        scaleDown:
+          stabilizationWindowSeconds: 300
+          policies:
+          - type: Percent
+            value: 50
+            periodSeconds: 60
+  triggers:
+  # Scale based on average request rate
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus-operated.monitoring.svc.cluster.local:9090
+      metricName: gpu_inference_request_rate
+      threshold: '10'  # Scale up when more than 10 requests per second
+      query: rate(gpu_inference_requests_total[2m])
+  # Scale based on active requests (queue depth)
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus-operated.monitoring.svc.cluster.local:9090
+      metricName: gpu_inference_active_requests
+      threshold: '5'  # Scale up when more than 5 concurrent requests
+      query: gpu_inference_active_requests
+  # Scale based on request latency (performance degradation)
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus-operated.monitoring.svc.cluster.local:9090
+      metricName: gpu_inference_latency_p95
+      threshold: '2'  # Scale up when P95 latency > 2 seconds
+      query: histogram_quantile(0.95, rate(gpu_inference_request_duration_seconds_bucket[2m]))
