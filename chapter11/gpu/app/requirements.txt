@@ -3,5 +3,5 @@ prometheus-client==0.17.1
 torch==2.7.1
 torchvision==0.22.1
 Pillow==10.0.0
-gunicorn==21.2.0
+gunicorn==23.0.0
 requests==2.32.4
