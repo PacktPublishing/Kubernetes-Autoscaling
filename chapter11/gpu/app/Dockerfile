@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.9.1-runtime-ubuntu24.04-slim
+FROM nvidia/cuda:12.9.1-runtime-ubuntu24.04
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
