@@ -44,7 +44,7 @@ data:
             { duration: '1m',  target: 700 },
             { duration: '1m',  target: 500 },
             { duration: '30s', target: 300 },
-            { duration: '30s', target: 0z },
+            { duration: '30s', target: 0 },
           ],
           gracefulStop: '10s',
         },
