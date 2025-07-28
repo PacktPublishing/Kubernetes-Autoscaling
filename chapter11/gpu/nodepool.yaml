@@ -38,8 +38,25 @@ kind: EC2NodeClass
 metadata:
   name: gpu
 spec:
+  amiFamily: Bottlerocket
   amiSelectorTerms:
-  - alias: "al2023@latest"
+    - alias: bottlerocket@v1.42.0
+  blockDeviceMappings:
+    # Root volume (OS) - 4Gi for Bottlerocket GPU AMIs
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 4Gi
+        volumeType: gp3
+        deleteOnTermination: true
+    # Data volume with your cached container images
+    - deviceName: /dev/xvdb
+      ebs:
+        volumeSize: 100Gi  # Match your snapshot size
+        volumeType: gp3
+        deleteOnTermination: true
+        snapshotID: snap-0123456789abcdef0  # Replace with your actual snapshot ID
+        throughput: 1000
+        iops: 4000
   role: "kubernetes-autoscaling"
   subnetSelectorTerms:
   - tags:
@@ -47,11 +64,3 @@ spec:
   securityGroupSelectorTerms:
   - tags:
       karpenter.sh/discovery: "kubernetes-autoscaling"
-  blockDeviceMappings:
-  - deviceName: /dev/xvda
-    ebs:
-      deleteOnTermination: true
-      iops: 10000
-      throughput: 125
-      volumeSize: 100Gi
-      volumeType: gp3

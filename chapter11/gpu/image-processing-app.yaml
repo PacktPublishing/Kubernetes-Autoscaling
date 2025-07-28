@@ -24,7 +24,6 @@ spec:
       containers:
       - name: image-processing-app
         image: christianhxc/image-processing-app:latest
-        imagePullPolicy: Always
         ports:
         - containerPort: 5000
           name: http
@@ -38,21 +37,6 @@ spec:
             nvidia.com/gpu: 1
             memory: "2Gi"
             cpu: "1"
-        env:
-        - name: CUDA_VISIBLE_DEVICES
-          value: "0"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 5000
-          initialDelaySeconds: 60
-          periodSeconds: 30
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 5000
-          initialDelaySeconds: 30
-          periodSeconds: 10
 ---
 apiVersion: v1
 kind: Service
