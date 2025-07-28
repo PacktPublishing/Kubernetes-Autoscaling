@@ -54,7 +54,7 @@ spec:
         volumeSize: 100Gi  # Match your snapshot size
         volumeType: gp3
         deleteOnTermination: true
-        snapshotID: snap-0123456789abcdef0  # Replace with your actual snapshot ID
+        # snapshotID: snap-0123456789abcdef0  # Replace with your actual snapshot ID
         throughput: 1000
         iops: 4000
   role: "kubernetes-autoscaling"
