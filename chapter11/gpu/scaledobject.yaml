@@ -29,12 +29,12 @@ spec:
     metadata:
       serverAddress: http://prometheus-operated.monitoring.svc.cluster.local:9090
       metricName: gpu_inference_request_rate
-      threshold: '10'  # Scale up when more than 10 requests per second
+      threshold: '30'  # Scale up when more than 10 requests per second
       query: sum(rate(gpu_inference_requests_total{exported_endpoint="/predict",status="200"}[2m]))
   # Scale based on request latency (performance degradation)
   - type: prometheus
     metadata:
       serverAddress: http://prometheus-operated.monitoring.svc.cluster.local:9090
       metricName: gpu_inference_latency_p95
-      threshold: '2'  # Scale up when P95 latency > 2 seconds
+      threshold: '0.8'  # Scale up when P95 latency > 800ms
       query: sum(histogram_quantile(0.95, rate(gpu_inference_request_duration_seconds_bucket{pod=~"image-processing-app-.*"}[2m])))
