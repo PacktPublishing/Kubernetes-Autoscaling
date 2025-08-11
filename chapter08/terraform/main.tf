@@ -121,6 +121,9 @@ module "eks" {
         }
       })
     }
+    eks-node-monitoring-agent = {
+      most_recent = true
+    }
   }
 
   vpc_id     = module.vpc.vpc_id

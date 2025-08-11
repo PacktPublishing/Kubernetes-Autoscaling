@@ -4,6 +4,9 @@ metadata:
   name: default
 spec:
   template:
+    metadata:
+      labels:
+        intent: apps
     spec:
       requirements:
         - key: kubernetes.io/arch
