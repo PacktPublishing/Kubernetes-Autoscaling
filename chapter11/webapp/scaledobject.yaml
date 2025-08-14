@@ -26,7 +26,7 @@ spec:
   - type: prometheus
     metadata:
       serverAddress: http://prometheus-kube-prometheus-prometheus.monitoring.svc:9090
-      metricName: monte_carlo_latency_seconds
-      threshold: "0.4" # assume SLA is 0.8 or 800ms really, but we want to scale out before
+      metricName: http_requests_total
+      threshold: "10" # Scale out if total request rate across all pods exceeds 10 rps
       query: |
-        sum(histogram_quantile(0.95, rate(monte_carlo_latency_seconds_bucket{namespace="default",pod=~"montecarlo-pi-.*"}[2m])))
+        sum(rate(http_requests_total{namespace="default",pod=~"montecarlo-pi-.*"}[1m]))
