@@ -1,0 +1,31 @@
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: gpu
+spec:
+  amiFamily: Bottlerocket
+  amiSelectorTerms:
+    - alias: bottlerocket@v1.42.0
+  blockDeviceMappings:
+    # Data volume with your cached container images
+    - deviceName: /dev/xvdb
+      ebs:
+        volumeSize: 100Gi  # Match your snapshot size
+        volumeType: gp3
+        deleteOnTermination: true
+        # snapshotID: snap-0123456789abcdef0  # Replace with your actual snapshot ID        
+        throughput: 1000
+        iops: 4000
+    # Root volume (OS) - 4Gi for Bottlerocket GPU AMIs
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 4Gi
+        volumeType: gp3
+        deleteOnTermination: true
+  role: "kubernetes-autoscaling"
+  subnetSelectorTerms:
+  - tags:
+      karpenter.sh/discovery: "kubernetes-autoscaling"
+  securityGroupSelectorTerms:
+  - tags:
+      karpenter.sh/discovery: "kubernetes-autoscaling"
