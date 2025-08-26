@@ -1,0 +1,69 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: nodepool-scale-up
+  namespace: kube-system
+spec:
+  schedule: "0 9 * * 1-5"  # 9 AM Monday-Friday UTC
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: nodepool-scheduler
+          restartPolicy: OnFailure
+          tolerations:
+          - key: "karpenter.sh/controller"
+            operator: "Equal"
+            value: "true"
+            effect: "NoSchedule"
+          nodeSelector:
+            karpenter.sh/controller: "true"
+          containers:
+          - name: scaler
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              echo "Starting NodePool scale-up at $(date)"
+              
+              # Get managed NodePools from ConfigMap
+              MANAGED_POOLS=$(kubectl get configmap nodepool-scheduler-config -n kube-system -o jsonpath='{.data.managed-nodepools}')
+              
+              if [ -z "$MANAGED_POOLS" ]; then
+                echo "No managed NodePools configured"
+                exit 0
+              fi
+              
+              IFS=',' read -ra POOLS <<< "$MANAGED_POOLS"
+              
+              for pool in "${POOLS[@]}"; do
+                pool=$(echo "$pool" | xargs)  # trim whitespace
+                
+                if ! kubectl get nodepool "$pool" >/dev/null 2>&1; then
+                  echo "Warning: NodePool '$pool' not found, skipping"
+                  continue
+                fi
+                
+                # Get original limits from annotation
+                ORIGINAL_LIMITS=$(kubectl get nodepool "$pool" -o jsonpath='{.metadata.annotations.scheduler\.karpenter\.sh/original-limits}')
+                
+                if [ -z "$ORIGINAL_LIMITS" ]; then
+                  echo "Warning: No original limits found for NodePool '$pool', removing all limits"
+                  kubectl patch nodepool "$pool" --type merge -p '{"spec":{"limits":null}}'
+                elif [ "$ORIGINAL_LIMITS" = "none" ]; then
+                  echo "NodePool '$pool' originally had no limits, removing limits"
+                  kubectl patch nodepool "$pool" --type merge -p '{"spec":{"limits":null}}'
+                else
+                  echo "Restoring limits for NodePool '$pool': $ORIGINAL_LIMITS"
+                  kubectl patch nodepool "$pool" --type merge -p "{\"spec\":{\"limits\":$ORIGINAL_LIMITS}}"
+                fi
+                
+                # Clean up annotation
+                kubectl annotate nodepool "$pool" scheduler.karpenter.sh/original-limits-
+                
+                echo "Scaled up NodePool '$pool'"
+              done
+              
+              echo "Scale-up completed at $(date)"

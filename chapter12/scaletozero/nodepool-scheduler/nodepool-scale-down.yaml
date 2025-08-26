@@ -1,0 +1,77 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: nodepool-scale-down
+  namespace: kube-system
+spec:
+  schedule: "0 17 * * 1-5"  # 5 PM Monday-Friday UTC
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: nodepool-scheduler
+          restartPolicy: OnFailure
+          tolerations:
+          - key: "karpenter.sh/controller"
+            operator: "Equal"
+            value: "true"
+            effect: "NoSchedule"
+          nodeSelector:
+            karpenter.sh/controller: "true"
+          containers:
+          - name: scaler
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              echo "Starting NodePool scale-down at $(date)"
+              
+              # Get managed NodePools from ConfigMap
+              MANAGED_POOLS=$(kubectl get configmap nodepool-scheduler-config -n kube-system -o jsonpath='{.data.managed-nodepools}')
+              
+              if [ -z "$MANAGED_POOLS" ]; then
+                echo "No managed NodePools configured"
+                exit 0
+              fi
+              
+              IFS=',' read -ra POOLS <<< "$MANAGED_POOLS"
+              
+              for pool in "${POOLS[@]}"; do
+                pool=$(echo "$pool" | xargs)  # trim whitespace
+                
+                if ! kubectl get nodepool "$pool" >/dev/null 2>&1; then
+                  echo "Warning: NodePool '$pool' not found, skipping"
+                  continue
+                fi
+                
+                # Get current limits
+                CURRENT_LIMITS=$(kubectl get nodepool "$pool" -o jsonpath='{.spec.limits}')
+                
+                if [ "$CURRENT_LIMITS" != "null" ] && [ -n "$CURRENT_LIMITS" ]; then
+                  # Store current limits in annotation
+                  kubectl annotate nodepool "$pool" \
+                    scheduler.karpenter.sh/original-limits="$CURRENT_LIMITS" \
+                    --overwrite
+                  echo "Stored limits for NodePool '$pool': $CURRENT_LIMITS"
+                else
+                  # Mark that there were no original limits
+                  kubectl annotate nodepool "$pool" \
+                    scheduler.karpenter.sh/original-limits="none" \
+                    --overwrite
+                  echo "NodePool '$pool' had no limits, marked as 'none'"
+                fi
+                
+                # Set limits to zero
+                kubectl patch nodepool "$pool" --type merge \
+                  -p '{"spec":{"limits":{"cpu":"0"}}}'
+                
+                # Delete existing NodeClaims (non-blocking)
+                echo "Removing NodeClaims for NodePool '$pool'..."
+                kubectl delete nodeclaim -l karpenter.sh/nodepool="$pool"
+                
+                echo "Scaled down NodePool '$pool'"
+              done
+              
+              echo "Scale-down completed at $(date)"
