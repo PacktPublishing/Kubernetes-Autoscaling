@@ -5,6 +5,8 @@ metadata:
   namespace: kube-system
 spec:
   schedule: "0 9 * * 1-5"  # 9 AM Monday-Friday UTC
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 5
   jobTemplate:
     spec:
       template:
