@@ -14,12 +14,12 @@ spec:
           serviceAccountName: nodepool-scheduler
           restartPolicy: OnFailure
           tolerations:
-          - key: "karpenter.sh/controller"
+          - key: "CriticalAddonsOnly"
             operator: "Equal"
             value: "true"
             effect: "NoSchedule"
           nodeSelector:
-            karpenter.sh/controller: "true"
+            CriticalAddonsOnly: "true"
           containers:
           - name: scaler
             image: bitnami/kubectl:latest

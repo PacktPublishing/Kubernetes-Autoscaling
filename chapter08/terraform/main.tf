@@ -142,7 +142,7 @@ module "eks" {
 
       labels = {
         # Used to ensure Karpenter runs on nodes that it does not manage
-        "karpenter.sh/controller" = "true"
+        "CriticalAddonsOnly" = "true"
       }
     }
   }
