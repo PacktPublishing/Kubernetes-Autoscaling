@@ -38,7 +38,7 @@ resource "helm_release" "karpenter" {
   values = [
     <<-EOT
     nodeSelector:
-      karpenter.sh/controller: 'true'
+      CriticalAddonsOnly: 'true'
     settings:
       clusterName: ${module.eks.cluster_name}
       clusterEndpoint: ${module.eks.cluster_endpoint}
