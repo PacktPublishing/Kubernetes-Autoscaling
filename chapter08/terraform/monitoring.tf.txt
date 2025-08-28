@@ -9,36 +9,71 @@ resource "helm_release" "kube_prometheus_stack" {
 
   values = [
     <<-EOF
+    grafana:
+      sidecar:
+        datasources:
+          enabled: true
+    EOF
+  ]
+}
+
+resource "helm_release" "loki_stack" {
+  name       = "loki"
+  namespace  = "monitoring"
+  repository = "https://grafana.github.io/helm-charts"
+  chart      = "loki-stack"
+  version    = "2.10.2"
+
+  values = [
+    <<-EOF
     loki:
       enabled: true
+      persistence:
+        enabled: true
+        size: 10Gi
       config:
         table_manager:
           retention_deletes_enabled: true
           retention_period: 168h
-        schema_config:
-          configs:
-            - from: 2020-10-15
-              store: boltdb-shipper
-              object_store: filesystem
-              schema: v11
-              index:
-                prefix: index_
-                period: 24h
+        compactor:
+          retention_enabled: true
 
     promtail:
       enabled: true
-      serviceAccount:
-        create: true
       config:
         clients:
           - url: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
-        scrape_configs:
-          - job_name: kubernetes-pods
-            static_configs:
-              - targets: [localhost]
-                labels:
-                  job: kubernetes-pods
-                  __path__: /var/log/pods/*/*/*.log
     EOF
+  ]
+
+  depends_on = [helm_release.kube_prometheus_stack]
+}
+
+resource "kubernetes_manifest" "loki_datasource" {
+  manifest = {
+    apiVersion = "v1"
+    kind       = "ConfigMap"
+    metadata = {
+      name      = "loki-datasource"
+      namespace = "monitoring"
+      labels = {
+        grafana_datasource = "1"
+      }
+    }
+    data = {
+      "loki.yaml" = <<-YAML
+        apiVersion: 1
+        datasources:
+        - name: Loki
+          type: loki
+          url: http://loki.monitoring.svc.cluster.local:3100
+          access: proxy
+          isDefault: false
+      YAML
+    }
+  }
+  depends_on = [
+    helm_release.kube_prometheus_stack,
+    helm_release.loki_stack,
   ]
 }

@@ -171,16 +171,6 @@ module "eks_blueprints_addons" {
   enable_aws_load_balancer_controller = true
   enable_metrics_server               = true
 
-  enable_aws_for_fluentbit = true
-  aws_for_fluentbit = {
-    set = [
-      {
-        name  = "cloudWatchLogs.region"
-        value = var.region
-      }
-    ]
-  }
-
   tags = local.tags
 }
 
