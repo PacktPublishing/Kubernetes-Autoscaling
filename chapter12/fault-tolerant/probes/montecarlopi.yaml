@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montecarlo-pi
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: montecarlo-pi
+  template:
+    metadata:
+      labels:
+        app: montecarlo-pi
+    spec:      
+      containers:
+      - name: montecarlo-pi
+        image: christianhxc/montecarlo-pi:fault-tolerant
+        ports:
+        - name: http
+          containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 8
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: 900m
+            memory: 512Mi
+          limits:
+            memory: 512Mi        
+      nodeSelector:
+        intent: apps        
