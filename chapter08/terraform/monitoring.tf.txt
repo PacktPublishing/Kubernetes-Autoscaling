@@ -6,4 +6,39 @@ resource "helm_release" "kube_prometheus_stack" {
   repository = "https://prometheus-community.github.io/helm-charts"
   chart      = "kube-prometheus-stack"
   version    = "48.1.1"
+
+  values = [
+    <<-EOF
+    loki:
+      enabled: true
+      config:
+        table_manager:
+          retention_deletes_enabled: true
+          retention_period: 168h
+        schema_config:
+          configs:
+            - from: 2020-10-15
+              store: boltdb-shipper
+              object_store: filesystem
+              schema: v11
+              index:
+                prefix: index_
+                period: 24h
+
+    promtail:
+      enabled: true
+      serviceAccount:
+        create: true
+      config:
+        clients:
+          - url: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
+        scrape_configs:
+          - job_name: kubernetes-pods
+            static_configs:
+              - targets: [localhost]
+                labels:
+                  job: kubernetes-pods
+                  __path__: /var/log/pods/*/*/*.log
+    EOF
+  ]
 }
