@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montecarlo-pi
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: montecarlo-pi
+  template:
+    metadata:
+      labels:
+        app: montecarlo-pi
+    spec:      
+      containers:
+      - name: montecarlo-pi
+        image: christianhxc/montecarlo-pi
+        ports:
+        - name: http
+          containerPort: 8080
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - |
+                echo "$(date): preStop hook started" > /proc/1/fd/1
+                echo "Performing cleanup operations..." > /proc/1/fd/1
+                sleep 75
+                echo "$(date): preStop hook cleanup completed" > /proc/1/fd/1
+        resources:
+          requests:
+            cpu: 900m
+            memory: 512Mi
+          limits:
+            memory: 512Mi        
+      nodeSelector:
+        intent: apps
