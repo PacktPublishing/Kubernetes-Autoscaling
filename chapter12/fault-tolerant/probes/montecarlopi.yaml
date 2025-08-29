@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: montecarlo-pi
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: montecarlo-pi
@@ -42,4 +42,5 @@ spec:
           limits:
             memory: 512Mi        
       nodeSelector:
-        intent: apps        
+        intent: apps
+      terminationGracePeriodSeconds: 90
