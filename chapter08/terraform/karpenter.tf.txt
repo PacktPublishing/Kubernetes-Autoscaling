@@ -32,7 +32,7 @@ resource "helm_release" "karpenter" {
   create_namespace = true
   repository       = "oci://public.ecr.aws/karpenter"
   chart            = "karpenter"
-  version          = "1.6.2"
+  version          = var.karpenter_version
   wait             = false
 
   values = [
@@ -73,6 +73,8 @@ resource "kubectl_manifest" "karpenter_default_ec2_node_class" {
       subnetSelectorTerms:
       - tags:
           karpenter.sh/discovery: ${module.eks.cluster_name}
+      tags:
+        Name: karpenter-default
   YAML
 
   depends_on = [

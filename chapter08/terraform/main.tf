@@ -89,7 +89,7 @@ module "eks" {
   version = "20.37.0"
 
   cluster_name                             = local.name
-  cluster_version                          = "1.33"
+  cluster_version                          = var.eks_version
   cluster_endpoint_public_access           = true
   enable_cluster_creator_admin_permissions = true
 
@@ -271,12 +271,3 @@ output "node_instance_role_name" {
   description = "IAM Role name that each Karpenter node will use"
   value       = local.name
 }
-
-## NOTE: It's going to use your AWS_REGION or AWS_DEFAULT_REGION environment variable,
-## but you can define which on to use in terraform.tfvars file as well, or pass it as an argument
-## in the CLI like this "terraform apply -var 'region=eu-west-1'"
-variable "region" {
-  description = "Region to deploy the resources"
-  type        = string
-}
-
