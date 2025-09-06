@@ -13,11 +13,6 @@ spec:
         spec:
           serviceAccountName: nodepool-scheduler
           restartPolicy: OnFailure
-          tolerations:
-          - key: "CriticalAddonsOnly"
-            operator: "Equal"
-            value: "true"
-            effect: "NoSchedule"
           nodeSelector:
             CriticalAddonsOnly: "true"
           containers:

@@ -5,5 +5,4 @@ metadata:
   namespace: kube-system
 data:
   managed-nodepools: "default"
-  # Timezone for logging (optional)
   timezone: "UTC"
