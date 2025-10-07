@@ -37,3 +37,4 @@ spec:
             memory: 512Mi        
       nodeSelector:
         intent: apps
+      terminationGracePeriodSeconds: 90
