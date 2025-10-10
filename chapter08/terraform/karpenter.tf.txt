@@ -8,7 +8,7 @@ locals {
 
 module "karpenter" {
   source  = "terraform-aws-modules/eks/aws//modules/karpenter"
-  version = "20.37.0"
+  version = "21.3.2"
 
   cluster_name          = module.eks.cluster_name
   enable_v1_permissions = true

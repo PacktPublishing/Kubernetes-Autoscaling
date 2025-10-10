@@ -9,11 +9,11 @@ variable "region" {
 variable "eks_version" {
   description = "Amazon EKS version to use"
   type        = string
-  default     = "1.33"
+  default     = "1.34"
 }
 
 variable "karpenter_version" {
   description = "Karpenter version to install"
   type        = string
-  default     = "1.6.2"
+  default     = "1.8.1"
 }
