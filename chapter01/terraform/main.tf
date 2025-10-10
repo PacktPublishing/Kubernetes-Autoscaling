@@ -184,6 +184,16 @@ module "eks_blueprints_addons_load_balancer_controller" {
     chart_version = "1.8.2"
   }
 
+  aws_load_balancer_controller = {
+    values = [
+      <<-EOT
+      region: ${var.region}
+      vpcId: ${module.vpc.vpc_id}
+      clusterName: ${module.eks.cluster_name}
+      EOT
+    ]
+  }
+
   tags = local.tags
 
   depends_on = [module.eks_blueprints_addons]

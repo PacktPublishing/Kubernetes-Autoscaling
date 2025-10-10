@@ -171,6 +171,16 @@ module "eks_blueprints_addons" {
   enable_aws_load_balancer_controller = true
   enable_metrics_server               = true
 
+  aws_load_balancer_controller = {
+    values = [
+      <<-EOT
+      region: ${var.region}
+      vpcId: ${module.vpc.vpc_id}
+      clusterName: ${module.eks.cluster_name}
+      EOT
+    ]
+  }
+
   tags = local.tags
 }
 
