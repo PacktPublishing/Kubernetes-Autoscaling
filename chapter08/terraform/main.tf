@@ -4,7 +4,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.95"
+      version = "~> 6.16"
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
@@ -88,12 +88,12 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "21.3.2"
 
-  cluster_name                             = local.name
-  cluster_version                          = var.eks_version
-  cluster_endpoint_public_access           = true
+  name                                     = local.name
+  kubernetes_version                       = var.eks_version
+  endpoint_public_access                   = true
   enable_cluster_creator_admin_permissions = true
 
-  cluster_addons = {
+  addons = {
     aws-ebs-csi-driver = {
       most_recent = true
       pod_identity_association = [{

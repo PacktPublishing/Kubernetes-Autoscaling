@@ -9,10 +9,35 @@ resource "helm_release" "kube_prometheus_stack" {
 
   values = [
     <<-EOF
+    prometheus:
+      enabled: true
+    alertmanager:
+      enabled: true
+
     grafana:
+      enabled: true
+      adminUser: admin
+      adminPassword: prom-operator
+
+      # Provision Prometheus & Loki datasources
+      datasources:
+        datasources.yaml:
+          apiVersion: 1
+          datasources:
+            - name: Prometheus
+              type: prometheus
+              access: proxy
+              url: http://prometheus-operated.monitoring.svc.cluster.local:9090
+              isDefault: true
+            - name: Loki
+              type: loki
+              access: proxy
+              url: http://loki.monitoring.svc.cluster.local:3100
+              isDefault: false
+
       sidecar:
         datasources:
-          enabled: true
+          enabled: false
     EOF
   ]
 }
@@ -23,6 +48,10 @@ resource "helm_release" "loki_stack" {
   repository = "https://grafana.github.io/helm-charts"
   chart      = "loki-stack"
   version    = "2.10.2"
+
+  depends_on = [
+    helm_release.kube_prometheus_stack,
+  ]
 
   values = [
     <<-EOF
@@ -44,36 +73,5 @@ resource "helm_release" "loki_stack" {
         clients:
           - url: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
     EOF
-  ]
-
-  depends_on = [helm_release.kube_prometheus_stack]
-}
-
-resource "kubernetes_manifest" "loki_datasource" {
-  manifest = {
-    apiVersion = "v1"
-    kind       = "ConfigMap"
-    metadata = {
-      name      = "loki-datasource"
-      namespace = "monitoring"
-      labels = {
-        grafana_datasource = "1"
-      }
-    }
-    data = {
-      "loki.yaml" = <<-YAML
-        apiVersion: 1
-        datasources:
-        - name: Loki
-          type: loki
-          url: http://loki.monitoring.svc.cluster.local:3100
-          access: proxy
-          isDefault: false
-      YAML
-    }
-  }
-  depends_on = [
-    helm_release.kube_prometheus_stack,
-    helm_release.loki_stack,
   ]
 }
