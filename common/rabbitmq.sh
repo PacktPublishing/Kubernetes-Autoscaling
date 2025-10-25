@@ -3,7 +3,7 @@
 # Install RabbitMQ Cluster Operator
 kubectl apply -f "https://github.com/rabbitmq/cluster-operator/releases/latest/download/cluster-operator.yml"
 
-# Wait a bit for operator to be ready
+# Wait for operator to be ready
 sleep 30
 
 # Create credentials secret
@@ -15,7 +15,9 @@ default_pass = autoscaling" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 # Deploy RabbitMQ cluster
-cat <<EOF | kubectl apply -f -
+if [ -z "$1" ]; then
+  # No nodeSelector
+  cat <<EOF | kubectl apply -f -
 apiVersion: rabbitmq.com/v1beta1
 kind: RabbitmqCluster
 metadata:
@@ -23,6 +25,26 @@ metadata:
 spec:
   replicas: 1
 EOF
+else
+  # With nodeSelector (format: key=value)
+  KEY="${1%%=*}"
+  VALUE="${1##*=}"
+  cat <<EOF | kubectl apply -f -
+apiVersion: rabbitmq.com/v1beta1
+kind: RabbitmqCluster
+metadata:
+  name: rabbitmq
+spec:
+  replicas: 1
+  override:
+    statefulSet:
+      spec:
+        template:
+          spec:
+            nodeSelector:
+              ${KEY}: "${VALUE}"
+EOF
+fi
 
 # Wait for RabbitMQ to be ready
 echo "Waiting for RabbitMQ to be ready..."
