@@ -1,5 +1,22 @@
 #!/bin/bash
 
+ACTION=$1
+NODE_SELECTOR=$2
+
+if [ "$ACTION" == "uninstall" ]; then
+  echo "Uninstalling RabbitMQ..."
+  kubectl delete rabbitmqcluster rabbitmq
+  kubectl delete secret rabbitmq-default-user
+  echo "RabbitMQ uninstalled!"
+  exit 0
+fi
+
+if [ "$ACTION" != "install" ]; then
+  echo "Usage: $0 [install|uninstall] [nodeSelector]"
+  echo "Example: $0 install intent=apps"
+  exit 1
+fi
+
 # Install RabbitMQ Cluster Operator
 kubectl apply -f "https://github.com/rabbitmq/cluster-operator/releases/latest/download/cluster-operator.yml"
 
@@ -15,7 +32,7 @@ default_pass = autoscaling" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 # Deploy RabbitMQ cluster
-if [ -z "$1" ]; then
+if [ -z "$NODE_SELECTOR" ]; then
   # No nodeSelector
   cat <<EOF | kubectl apply -f -
 apiVersion: rabbitmq.com/v1beta1
@@ -26,9 +43,9 @@ spec:
   replicas: 1
 EOF
 else
-  # With nodeSelector (format: key=value)
-  KEY="${1%%=*}"
-  VALUE="${1##*=}"
+  # With nodeSelector
+  KEY="${NODE_SELECTOR%%=*}"
+  VALUE="${NODE_SELECTOR##*=}"
   cat <<EOF | kubectl apply -f -
 apiVersion: rabbitmq.com/v1beta1
 kind: RabbitmqCluster
