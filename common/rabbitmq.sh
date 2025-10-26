@@ -6,7 +6,6 @@ NODE_SELECTOR=$2
 if [ "$ACTION" == "uninstall" ]; then
   echo "Uninstalling RabbitMQ..."
   kubectl delete rabbitmqcluster rabbitmq
-  kubectl delete secret rabbitmq-default-user
   echo "RabbitMQ uninstalled!"
   exit 0
 fi
