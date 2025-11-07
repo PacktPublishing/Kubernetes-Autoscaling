@@ -42,7 +42,7 @@ metadata:
 spec:
   role: "kubernetes-autoscaling"
   amiSelectorTerms:
-    - alias: "bottlerocket@1.34.0"
+    - alias: "bottlerocket@1.50.0"
   subnetSelectorTerms:
     - tags:
         karpenter.sh/discovery: "kubernetes-autoscaling"

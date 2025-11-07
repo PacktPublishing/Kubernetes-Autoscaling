@@ -5,7 +5,7 @@ metadata:
 spec:
   amiFamily: Bottlerocket
   amiSelectorTerms:
-    - alias: bottlerocket@v1.42.0
+    - alias: bottlerocket@1.50.0
   blockDeviceMappings:
     # Data volume with your cached container images
     - deviceName: /dev/xvdb

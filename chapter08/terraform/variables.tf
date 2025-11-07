@@ -15,5 +15,5 @@ variable "eks_version" {
 variable "karpenter_version" {
   description = "Karpenter version to install"
   type        = string
-  default     = "1.8.1"
+  default     = "1.8.2"
 }
