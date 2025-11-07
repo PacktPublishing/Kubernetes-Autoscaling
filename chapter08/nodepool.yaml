@@ -32,7 +32,7 @@ spec:
   limits:
     cpu: 1000
   disruption:
-    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidationPolicy: WhenEmpty
     consolidateAfter: 1m
 ---
 apiVersion: karpenter.k8s.aws/v1
